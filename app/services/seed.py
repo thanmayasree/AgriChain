@@ -118,6 +118,50 @@ def seed_if_empty(db: Session) -> None:
         },
     ]
 
+    catalog = [
+        ("Rice", "Sona Masuri", "Konaseema", "Visakhapatnam"),
+        ("Basmati Rice", "Pusa 1121", "Karnal", "Delhi"),
+        ("Sona Masuri Rice", "Sona Masuri", "Nellore", "Chennai"),
+        ("Wheat", "HD-2967", "Ludhiana", "Delhi"),
+        ("Maize", "DHM-117", "Eluru", "Vijayawada"),
+        ("Cotton", "Bunny Bt", "Warangal", "Hyderabad"),
+        ("Groundnut", "Kadiri-6", "Anantapur", "Bengaluru"),
+        ("Sugarcane", "Co-86032", "Kolhapur", "Pune"),
+        ("Red Chilli", "Guntur Sannam", "Guntur", "Hyderabad"),
+        ("Green Chilli", "Jwala", "Khammam", "Hyderabad"),
+        ("Turmeric", "Salem", "Erode", "Chennai"),
+        ("Black Pepper", "Panniyur", "Idukki", "Kochi"),
+        ("Cardamom", "Green Gold", "Thekkady", "Kochi"),
+        ("Cumin", "GC-4", "Unjha", "Ahmedabad"),
+        ("Coriander", "Rajasthan Local", "Kota", "Jaipur"),
+        ("Tomato", "Arka Rakshak", "Madanapalle", "Bengaluru"),
+        ("Onion", "Nashik Red", "Nashik", "Mumbai"),
+        ("Potato", "Kufri Jyoti", "Agra", "Delhi"),
+        ("Mango", "Banganapalli", "Nuzvid", "Hyderabad"),
+        ("Banana", "Grand Naine", "Jalgaon", "Mumbai"),
+        ("Coconut", "West Coast Tall", "Pollachi", "Coimbatore"),
+        ("Cashew", "Vengurla-4", "Palasa", "Visakhapatnam"),
+        ("Coffee", "Arabica", "Chikmagalur", "Bengaluru"),
+        ("Tea", "Darjeeling First Flush", "Darjeeling", "Kolkata"),
+        ("Soybean", "JS-335", "Indore", "Bhopal"),
+        ("Green Gram", "IPM-02-3", "Prakasam", "Vijayawada"),
+        ("Black Gram", "VBN-8", "Villupuram", "Chennai"),
+        ("Chickpea", "JG-11", "Vidisha", "Bhopal"),
+        ("Lentils", "PL-8", "Sagar", "Bhopal"),
+        ("Pigeon Pea", "Asha", "Kalaburagi", "Hyderabad"),
+    ]
+    paths = ["good", "partial", "delay", "tampered", "missing", "quantity"]
+    for crop, variety, origin, dest in catalog:
+        code = "".join(ch for ch in crop.upper() if ch.isalpha())[:6]
+        count = 8 if crop == "Rice" else 6
+        for i in range(count):
+            specs.append({
+                "crop": crop, "variety": variety, "qty": 1200 + i * 175,
+                "origin": origin, "dest": dest, "grade_path": paths[i % len(paths)],
+                "harvest": f"2026-08-{10 + (i % 15):02d}",
+                "prices": (32, 45, 58, 72), "force_id": f"{code}-B{i + 1:03d}",
+            })
+
     actor_map = {
         "HARVEST": (users["FARMER"], "Konaseema"),
         "COLLECTION": (users["COLLECTION_CENTER"], "Amalapuram Collection Center"),
@@ -126,6 +170,7 @@ def seed_if_empty(db: Session) -> None:
         "WAREHOUSE_ENTRY": (users["WAREHOUSE_MANAGER"], "Eluru Cold Store"),
         "WAREHOUSE_EXIT": (users["WAREHOUSE_MANAGER"], "Eluru Cold Store"),
         "PROCESSING": (users["PROCESSOR"], "Bhimavaram Mill"),
+        "PACKAGING": (users["PROCESSOR"], "Bhimavaram Packaging Unit"),
         "DISTRIBUTION": (users["DISTRIBUTOR"], "Vijayawada Hub"),
         "RETAIL": (users["RETAILER"], "GreenMart Visakhapatnam"),
     }
@@ -161,17 +206,21 @@ def seed_if_empty(db: Session) -> None:
         generate_qr_png(bid)
 
         path = spec["grade_path"]
-        events = ["HARVEST", "COLLECTION", "QUALITY_CHECK"]
-        if path != "failed":
-            events += ["TRANSPORT", "WAREHOUSE_ENTRY", "WAREHOUSE_EXIT", "PROCESSING", "DISTRIBUTION"]
-        if path == "good":
-            events.append("RETAIL")
+        stage_order = ["HARVEST", "COLLECTION", "PROCESSING", "QUALITY_CHECK", "PACKAGING", "WAREHOUSE_ENTRY", "TRANSPORT", "RETAIL"]
+        registered_count = {"good": 8, "partial": 4, "delay": 7, "tampered": 8, "missing": 4, "quantity": 6, "mid": 5, "failed": 3, "risk": 7}.get(path, 8)
+        events = stage_order[:registered_count]
 
         for et in events:
             actor, loc = actor_map[et]
-            meta = {"note": f"{et} recorded for demo"}
+            meta = {"note": f"{et} registered", "stage_index": stage_order.index(et) + 1, "registration_state": "REGISTERED"}
             if et == "TRANSPORT":
                 meta.update({"distance_km": 82 if path != "risk" else 210, "delay_hours": 3 if path != "risk" else 31})
+            if path == "delay" and et == "TRANSPORT":
+                meta["abnormality"] = {"type":"DELAYED","what":"Transport exceeded the approved delivery window.","why":"Heavy traffic and a temporary highway closure.","how":"GPS timestamps show extended checkpoint dwell time.","where":"Vijayawada checkpoint","when":"2026-08-18T14:20:00Z","expected":"10 hours","actual":"19 hours","difference":"+9 hours","impact":"Retail arrival missed the planned window.","current_status":"Released after route clearance","risk":"MEDIUM","evidence":"GPS route log"}
+            if path == "tampered" and et == "PROCESSING":
+                meta["abnormality"] = {"type":"MODIFIED_TAMPERED","what":"Processing quantity no longer matches the anchored record.","why":"The quantity field was edited after signing.","how":"The recomputed data hash differs from the stored hash.","where":"Processing facility","when":"2026-08-17T11:05:00Z","expected":"1,820 kg","actual":"1,940 kg","difference":"+120 kg","impact":"Batch quarantined pending integrity review.","current_status":"Under regulator review","risk":"HIGH","evidence":"Ledger hash comparison"}
+            if path == "quantity" and et == "WAREHOUSE_ENTRY":
+                meta["abnormality"] = {"type":"QUANTITY_DISCREPANCY","what":"Warehouse intake is lower than packaging dispatch.","why":"Damaged sacks were isolated during unloading.","how":"Calibrated intake weight was compared with dispatch weight.","where":"Central warehouse","when":"2026-08-19T09:30:00Z","expected":"2,000 kg","actual":"1,936 kg","difference":"-64 kg (3.2%)","impact":"Inventory settlement requires reconciliation.","current_status":"Reconciliation open","risk":"MEDIUM","evidence":"Weighbridge certificate"}
             record_event(
                 db,
                 batch=batch,
@@ -252,6 +301,10 @@ def seed_if_empty(db: Session) -> None:
                 )
             )
         refresh_scores(db, batch)
+        if path in {"delay", "quantity"}:
+            batch.risk_score, batch.risk_level, batch.verification_status = 58, "MEDIUM", "WARNING"
+        elif path in {"tampered", "missing"}:
+            batch.risk_score, batch.risk_level, batch.verification_status = 82, "HIGH", "UNABLE_TO_VERIFY" if path == "missing" else "WARNING"
         db.commit()
 
     # unused roles list kept for documentation
