@@ -8,6 +8,14 @@ class LoginRequest(BaseModel):
     password: str
 
 
+class SignupRequest(BaseModel):
+    email: str = Field(min_length=5, max_length=160)
+    password: str = Field(min_length=8, max_length=72)
+    full_name: str = Field(min_length=2, max_length=100)
+    organization: str = Field(default="", max_length=120)
+    location: str = Field(default="", max_length=120)
+
+
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
