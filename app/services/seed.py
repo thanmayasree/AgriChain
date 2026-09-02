@@ -24,6 +24,15 @@ from app.services.chain_service import next_batch_id, record_event, refresh_scor
 
 DEMO_PASSWORD = os.environ.get("DEMO_PASSWORD", "")
 FARMER_PASSWORD = os.environ.get("FARMER_PASSWORD", "")
+STAGE_PASSWORDS = {
+    "farmer@agrichain.local": os.environ.get("FARMER_PASSWORD", ""),
+    "collection@agrichain.local": os.environ.get("COLLECTION_PASSWORD", ""),
+    "processor@agrichain.local": os.environ.get("PROCESSOR_PASSWORD", ""),
+    "inspector@agrichain.local": os.environ.get("INSPECTOR_PASSWORD", ""),
+    "warehouse@agrichain.local": os.environ.get("WAREHOUSE_PASSWORD", ""),
+    "transporter@agrichain.local": os.environ.get("TRANSPORTER_PASSWORD", ""),
+    "retailer@agrichain.local": os.environ.get("RETAILER_PASSWORD", ""),
+}
 
 ACCOUNTS = [
     ("admin@agrichain.local", "Administrator", "ADMIN", "AgriChain HQ", "Amaravati"),
@@ -42,10 +51,13 @@ ACCOUNTS = [
 
 def seed_if_empty(db: Session) -> None:
     if db.query(User).count() > 0:
-        if FARMER_PASSWORD:
-            farmer_account = db.query(User).filter_by(email="farmer@agrichain.local").first()
-            if farmer_account:
-                farmer_account.hashed_password = hash_password(FARMER_PASSWORD)
+        for email, password in STAGE_PASSWORDS.items():
+            if not password:
+                continue
+            account = db.query(User).filter_by(email=email).first()
+            if account:
+                account.hashed_password = hash_password(password)
+        if any(STAGE_PASSWORDS.values()):
             db.commit()
         return
     if not DEMO_PASSWORD:
