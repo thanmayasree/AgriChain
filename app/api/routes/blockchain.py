@@ -44,6 +44,30 @@ def verify_chain(_=Depends(get_current_user)):
     }
 
 
+@router.get("/blockchain-public")
+def public_blockchain_proof():
+    """Sanitized public proof: hashes and counts only, without transaction payloads."""
+    ledger = get_ledger()
+    valid, reason, failed = ledger.is_chain_valid()
+    return {
+        "valid": valid,
+        "message": "Blockchain integrity verified" if valid else "INTEGRITY COMPROMISED",
+        "reason": reason,
+        "failed_block": failed,
+        "blocks": [
+            {
+                "index": b.index,
+                "timestamp": b.timestamp,
+                "previous_hash": b.previous_hash,
+                "nonce": b.nonce,
+                "hash": b.hash,
+                "transaction_count": len(b.transactions),
+            }
+            for b in ledger.chain
+        ],
+    }
+
+
 @router.get("/blocks/{index}")
 def get_block(index: int, _=Depends(get_current_user)):
     ledger = get_ledger()
