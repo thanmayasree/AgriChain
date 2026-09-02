@@ -12,6 +12,7 @@ from app.api.routes import (
     health,
     iot,
     quality,
+    products,
     recalls,
     risk,
     users,
@@ -24,6 +25,7 @@ api_router.include_router(auth.router, prefix="/auth", tags=["auth"])
 api_router.include_router(users.router, prefix="/users", tags=["users"])
 api_router.include_router(farmers.router, prefix="/farmers", tags=["farmers"])
 api_router.include_router(batches.router, prefix="/batches", tags=["batches"])
+api_router.include_router(products.router, prefix="/products", tags=["products"])
 api_router.include_router(events.router, tags=["events"])
 api_router.include_router(quality.router, tags=["quality"])
 api_router.include_router(iot.router, tags=["iot"])
