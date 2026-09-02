@@ -23,6 +23,7 @@ from app.qr.codes import generate_qr_png, sha256_obj
 from app.services.chain_service import next_batch_id, record_event, refresh_scores
 
 DEMO_PASSWORD = os.environ.get("DEMO_PASSWORD", "")
+FARMER_PASSWORD = os.environ.get("FARMER_PASSWORD", "")
 
 ACCOUNTS = [
     ("admin@agrichain.local", "Administrator", "ADMIN", "AgriChain HQ", "Amaravati"),
@@ -41,6 +42,11 @@ ACCOUNTS = [
 
 def seed_if_empty(db: Session) -> None:
     if db.query(User).count() > 0:
+        if FARMER_PASSWORD:
+            farmer_account = db.query(User).filter_by(email="farmer@agrichain.local").first()
+            if farmer_account:
+                farmer_account.hashed_password = hash_password(FARMER_PASSWORD)
+            db.commit()
         return
     if not DEMO_PASSWORD:
         raise RuntimeError("DEMO_PASSWORD must be configured before initial database seeding")
