@@ -9,6 +9,7 @@ from app.blockchain.ledger import get_ledger
 from app.core.config import ROOT, settings
 from app.core.database import Base, SessionLocal, engine
 from app.services.seed import seed_if_empty
+from app.services.chain_service import reconcile_ledger
 
 
 @asynccontextmanager
@@ -19,6 +20,7 @@ async def lifespan(_app: FastAPI):
     try:
         seed_if_empty(db)
         db.commit()
+        reconcile_ledger(db)
     finally:
         db.close()
     yield
