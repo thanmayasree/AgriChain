@@ -26,7 +26,7 @@ async def lifespan(_app: FastAPI):
 
 app = FastAPI(
     title="AgriChain API",
-    description="Blockchain + AI + IoT agricultural supply-chain transparency",
+    description="Farmer-to-customer agricultural traceability with blockchain verification",
     version="2.0.0",
     docs_url="/docs",
     redoc_url="/redoc",
@@ -35,8 +35,8 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.cors_list,
-    allow_credentials=False,
+    allow_origins=settings.cors_list + ["*"],
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )

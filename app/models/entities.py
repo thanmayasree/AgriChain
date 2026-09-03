@@ -261,3 +261,79 @@ class OfflineQueueItem(Base):
     payload_json: Mapped[str] = mapped_column(Text)
     status: Mapped[str] = mapped_column(String(32), default="PENDING")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+
+class BatchInventory(Base):
+    __tablename__ = "batch_inventory"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    batch_id: Mapped[int] = mapped_column(ForeignKey("batches.id"), unique=True, index=True)
+    category: Mapped[str] = mapped_column(String(80), default="Agricultural Produce")
+    grade: Mapped[str] = mapped_column(String(32), default="Grade 1")
+    bags: Mapped[int] = mapped_column(Integer, default=0)
+    quantity_per_bag: Mapped[float] = mapped_column(Float, default=0)
+    unit: Mapped[str] = mapped_column(String(16), default="kg")
+    available_quantity: Mapped[float] = mapped_column(Float)
+    minimum_order_quantity: Mapped[float] = mapped_column(Float, default=1)
+    price_per_unit: Mapped[float] = mapped_column(Float, default=0)
+    best_before: Mapped[str] = mapped_column(String(32), default="")
+    certification: Mapped[str] = mapped_column(String(255), default="")
+    status: Mapped[str] = mapped_column(String(32), default="AVAILABLE")
+    is_demo: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+
+class Customer(Base):
+    __tablename__ = "customers"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    customer_code: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    name: Mapped[str] = mapped_column(String(160))
+    phone: Mapped[str] = mapped_column(String(32))
+    email: Mapped[str] = mapped_column(String(255), unique=True, index=True)
+    location: Mapped[str] = mapped_column(String(255))
+    city: Mapped[str] = mapped_column(String(100), default="")
+    district: Mapped[str] = mapped_column(String(100), default="")
+    state: Mapped[str] = mapped_column(String(100), default="")
+    pincode: Mapped[str] = mapped_column(String(12), default="")
+    delivery_address: Mapped[str] = mapped_column(String(500))
+    lat: Mapped[float | None] = mapped_column(Float, nullable=True)
+    lng: Mapped[float | None] = mapped_column(Float, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+
+class Order(Base):
+    __tablename__ = "orders"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    order_id: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    customer_id: Mapped[int] = mapped_column(ForeignKey("customers.id"), index=True)
+    batch_id: Mapped[int] = mapped_column(ForeignKey("batches.id"), index=True)
+    ordered_quantity: Mapped[float] = mapped_column(Float)
+    unit: Mapped[str] = mapped_column(String(16), default="kg")
+    bags: Mapped[int] = mapped_column(Integer, default=0)
+    price_per_unit: Mapped[float] = mapped_column(Float, default=0)
+    total_amount: Mapped[float] = mapped_column(Float, default=0)
+    source: Mapped[str] = mapped_column(String(255))
+    destination: Mapped[str] = mapped_column(String(255))
+    distance_km: Mapped[float | None] = mapped_column(Float, nullable=True)
+    travel_hours: Mapped[float | None] = mapped_column(Float, nullable=True)
+    estimated_delivery: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    actual_delivery: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    status: Mapped[str] = mapped_column(String(32), default="CONFIRMED")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    customer: Mapped[Customer] = relationship()
+    batch: Mapped[Batch] = relationship()
+
+
+class OrderStage(Base):
+    __tablename__ = "order_stages"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    order_id: Mapped[int] = mapped_column(ForeignKey("orders.id"), index=True)
+    stage_index: Mapped[int] = mapped_column(Integer)
+    name: Mapped[str] = mapped_column(String(64))
+    status: Mapped[str] = mapped_column(String(32), default="PENDING")
+    expected_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    location: Mapped[str] = mapped_column(String(255), default="")
+    description: Mapped[str] = mapped_column(String(500), default="")
+    block_index: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    block_hash: Mapped[str] = mapped_column(String(64), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
