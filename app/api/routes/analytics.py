@@ -49,6 +49,24 @@ def analytics(crop: str | None = None, db: Session = Depends(get_db), _=Depends(
     }
 
 
+@router.get("/activity")
+def public_activity(limit: int = 25, db: Session = Depends(get_db)):
+    """Privacy-safe public index used to connect blocks with batch events."""
+    safe_limit = max(1, min(limit, 1000))
+    rows = db.query(SupplyChainEvent).order_by(SupplyChainEvent.id.desc()).limit(safe_limit).all()
+    return {"events": [{
+        "id": e.id,
+        "batch_id": e.batch_id,
+        "event_type": e.event_type,
+        "actor_id": e.actor_role,
+        "location": e.location,
+        "timestamp": e.created_at.isoformat(),
+        "data_hash": e.data_hash,
+        "block_index": e.block_index,
+        "data": {},
+    } for e in rows]}
+
+
 @router.get("/notifications")
 def notifications(db: Session = Depends(get_db), _=Depends(get_current_user)):
     rows = db.query(Notification).order_by(Notification.id.desc()).limit(50).all()
