@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.ai.engine import engine, sustainability_score, trust_score
 from app.blockchain.eth import commit_event
-from app.blockchain.ledger import get_ledger
+from app.blockchain.ledger import get_ledger, rebuild_from_transactions
 from app.models.entities import (
     AuditLog,
     Batch,
@@ -134,6 +134,48 @@ def refresh_scores(db: Session, batch: Batch, extra: dict | None = None) -> None
         notify(db, "Temperature anomaly", f"{batch.batch_id} sensor flagged", "TEMP_ANOMALY", batch.batch_id)
     if qi and qi.status == "FAILED":
         notify(db, "Quality failure", f"{batch.batch_id} failed inspection", "QUALITY_FAIL", batch.batch_id)
+
+
+def reconcile_ledger(db: Session) -> dict:
+    """Restore the volatile PoW chain from validated durable transaction rows."""
+    rows = db.query(ChainTransaction).order_by(ChainTransaction.id.asc()).all()
+    ledger = get_ledger()
+    valid, _, _ = ledger.is_chain_valid()
+    represented = sum(len(block.transactions) for block in ledger.chain)
+    if valid and represented == len(rows):
+        return {"rebuilt": False, "blocks": len(ledger.chain), "transactions": len(rows)}
+
+    payloads: list[dict] = []
+    for row in rows:
+        try:
+            payload = json.loads(row.payload_json)
+        except (TypeError, ValueError, json.JSONDecodeError) as exc:
+            raise RuntimeError(f"Cannot reconcile malformed transaction {row.tx_id}") from exc
+        if not isinstance(payload, dict) or payload.get("tx_id") != row.tx_id:
+            raise RuntimeError(f"Cannot reconcile invalid transaction {row.tx_id}")
+        payloads.append(payload)
+
+    rebuilt = rebuild_from_transactions(payloads)
+    for block in rebuilt.chain:
+        stored = db.query(BlockchainBlock).filter_by(index=block.index).first()
+        if stored is None:
+            stored = BlockchainBlock(index=block.index)
+            db.add(stored)
+        stored.timestamp = block.timestamp
+        stored.previous_hash = block.previous_hash
+        stored.nonce = block.nonce
+        stored.hash = block.hash
+        stored.tx_count = len(block.transactions)
+
+    for index, row in enumerate(rows, start=1):
+        block = rebuilt.chain[index]
+        row.block_index = block.index
+        event = db.query(SupplyChainEvent).filter_by(tx_id=row.tx_id).first()
+        if event:
+            event.block_index = block.index
+            event.block_hash = block.hash
+    db.commit()
+    return {"rebuilt": True, "blocks": len(rebuilt.chain), "transactions": len(rows)}
 
 
 def record_event(
