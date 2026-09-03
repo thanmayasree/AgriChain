@@ -27,6 +27,18 @@ def persist() -> None:
     get_ledger().save(settings.chain_path)
 
 
+def rebuild_from_transactions(transactions: list[dict[str, Any]]) -> Blockchain:
+    """Recreate the volatile PoW chain from durable database transaction payloads."""
+    global _ledger
+    rebuilt = Blockchain(difficulty=settings.pow_difficulty)
+    for transaction in transactions:
+        rebuilt.add_transaction(transaction)
+        rebuilt.mine_pending_transactions()
+    _ledger = rebuilt
+    persist()
+    return rebuilt
+
+
 def snapshot() -> None:
     global _snapshot
     _snapshot = json.loads(json.dumps(get_ledger().to_dict(), default=str))
